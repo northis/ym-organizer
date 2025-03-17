@@ -2,9 +2,6 @@ The MIT License
 
 Copyright (c) 2014 Kaimi, https://kaimi.io
 
-Modified by Mikhail Berdnikov (c) 2025, https://github.com/northis/ (The Powershell organizer and perl changes)
-This fork uses TagLibSharp.dll, which is a C# port of the TagLib library by LGPL-2.1 license. You can obtain it here: https://github.com/mono/taglib-sharp
-
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
 the Software without restriction, including without limitation the rights to

@@ -161,7 +161,7 @@ ya.pl [-adhklpstu] [long options...]
         ya.pl -u
         https://music.yandex.ru/users/ya.playlist/playlists/1257 --cookie ...
 
-        2013-2023 by Kaimi (https://kaimi.io)
+        © 2013-2023 by Kaimi (https://kaimi.io)
 
 ## PowerShell Script for Automated Downloads
 

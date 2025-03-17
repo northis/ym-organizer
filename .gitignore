@@ -19,3 +19,6 @@ Sessionx.vim
 tags
 # Persistent undo
 [._]*.un~
+
+# Configuration files with sensitive data
+config.ps1

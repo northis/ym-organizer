@@ -198,7 +198,6 @@ my ($opt, $usage) = Getopt::Long::Descriptive::describe_options
 	['track|t:i',       'track to download (album id must be specified)'],
 	['url|u:s',         'download by URL'],
 	['dir|d:s',         'download path (current direcotry will be used by default)', {default => '.'}],
-	['skip-existing',   'skip downloading tracks that already exist on the specified path'],
 	['proxy=s',         'HTTP-proxy (format: 1.2.3.4:8888)'],
 	['exclude=s',       'skip tracks specified in file'],
 	['include=s',       'download only tracks specified in file'],
@@ -230,6 +229,9 @@ my ($opt, $usage) = Getopt::Long::Descriptive::describe_options
 	[basename(__FILE__) . ' -u https://music.yandex.ru/album/215690 --cookie ...'],
 	[basename(__FILE__) . ' -u https://music.yandex.ru/album/215688/track/1710808 --auth ...'],
 	[basename(__FILE__) . ' -u https://music.yandex.ru/users/ya.playlist/playlists/1257 --cookie ...'],
+	[],
+	['last_author=s',   'last track author to download'],
+	['last_title=s',    'last track title to download'],
 	[],
 	[COPYRIGHT]
 );
@@ -413,9 +415,35 @@ if($opt{album} || ($opt{playlist} && $opt{kind}))
 		info(ERROR, 'Can\'t get track list info');
 		exit(1);
 	}
+	
+	# Check if we have last_author and last_title parameters
+	my $last_author = $opt{'last_author'};
+	my $last_title = $opt{'last_title'};
+	my $found_existing_track = 0;	
+	if ($last_author && $last_title) {
+		info(INFO, "Will stop downloading when finding track: $last_author - $last_title");
+	}
 
 	for my $track_info_ref(@track_list_info)
 	{
+		# Skip tracks with no title
+		if(!$track_info_ref->{title})
+		{
+			info(ERROR, 'Track with non-existent title. Skipping...');
+			next;
+		}
+		
+		# Extract artist and title information
+		my $artist = '';
+		my $title = $track_info_ref->{title};
+		my $last_title = "$last_author - $last_title";
+		
+		if ($title eq $last_title) {
+			info(INFO, "Found the last downloaded track: $artist - $title");
+			$found_existing_track = 1;
+			last;
+		}
+		
 		my $skip = 0;
 		for my $title(@exclude)
 		{
@@ -430,7 +458,7 @@ if($opt{album} || ($opt{playlist} && $opt{kind}))
 		{
 			$skip = 1;
 		}
-
+		
 		if($skip)
 		{
 			info(INFO, 'Skipping: ' . $track_info_ref->{title});
@@ -452,12 +480,6 @@ if($opt{album} || ($opt{playlist} && $opt{kind}))
 			next;
 		}
 
-		if(!$track_info_ref->{title})
-		{
-			info(ERROR, 'Track with non-existent title. Skipping...');
-			next;
-		}
-
 		if($opt{link})
 		{
 			print(get_track_url($track_info_ref));
@@ -466,15 +488,22 @@ if($opt{album} || ($opt{playlist} && $opt{kind}))
 		{
 			fetch_track($track_info_ref);
 
-			if($opt{delay} && $track_info_ref != $track_list_info[-1])
+			if($opt{delay} && !$found_existing_track)
 			{
 				info(INFO, 'Waiting for ' . $opt{delay} . ' seconds');
 				sleep $opt{delay};
 			}
 		}
 	}
-
-	info(OK, 'Done!');
+	
+	if($found_existing_track)
+	{
+		info(OK, 'Stopped downloading after finding existing track.');
+	}
+	else
+	{
+		info(OK, 'Done!');
+	}
 }
 
 if(IS_WIN)
@@ -752,7 +781,7 @@ sub get_album_tracks_info
 	my $json = create_json($json_data);
 	if(!$json)
 	{
-		info(DEBUG, 'Can\'t create json from data: ' . $@);
+		info(DEBUG, 'Can\'t create json from data');
 		log_response($request);
 		return;
 	}
@@ -820,7 +849,7 @@ sub get_playlist_tracks_info
 	my $json = create_json($json_data);
 	if(!$json)
 	{
-		info(DEBUG, 'Can\'t create json from data: ' . $@);
+		info(DEBUG, 'Can\'t create json from data');
 		log_response($request);
 		return;
 	}

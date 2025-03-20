@@ -7,6 +7,7 @@ use Encode qw/from_to decode/;
 use Encode::Guess;
 use File::Basename;
 use POSIX qw/strftime/;
+use Unicode::Normalize;
 
 use constant IS_WIN => $^O eq 'MSWin32';
 use constant
@@ -232,12 +233,31 @@ my ($opt, $usage) = Getopt::Long::Descriptive::describe_options
 	[],
 	['last_author=s',   'last track author to download'],
 	['last_title=s',    'last track title to download'],
+	['last_author_file=s', 'file containing last track author to download (UTF-8 encoded)'],
+	['last_title_file=s',  'file containing last track title to download (UTF-8 encoded)'],
 	[],
 	[COPYRIGHT]
 );
 
 # Get a modifiable options copy
 my %opt = %{$opt};
+
+# Read last_author and last_title from files if specified
+if ($opt{last_author_file} && -f $opt{last_author_file}) {
+	open my $fh, '<:encoding(UTF-8)', $opt{last_author_file} or die "Could not open $opt{last_author_file}: $!";
+	$opt{last_author} = do { local $/; <$fh> };
+	close $fh;
+	chomp $opt{last_author};
+	info(INFO, "Read last author from file: $opt{last_author}") if $opt{debug};
+}
+
+if ($opt{last_title_file} && -f $opt{last_title_file}) {
+	open my $fh, '<:encoding(UTF-8)', $opt{last_title_file} or die "Could not open $opt{last_title_file}: $!";
+	$opt{last_title} = do { local $/; <$fh> };
+	close $fh;
+	chomp $opt{last_title};
+	info(INFO, "Read last title from file: $opt{last_title}") if $opt{debug};
+}
 
 if( $opt{help} || ( !$opt{url} && !($opt{track} && $opt{album}) && !$opt{album} && !($opt{playlist} && $opt{kind}) )  )
 {
@@ -419,6 +439,11 @@ if($opt{album} || ($opt{playlist} && $opt{kind}))
 	# Check if we have last_author and last_title parameters
 	my $last_author = $opt{'last_author'};
 	my $last_title = $opt{'last_title'};
+	
+	# Remove Byte Order Mark (BOM) if present
+	$last_author = remove_bom($last_author);
+	$last_title = remove_bom($last_title);
+
 	my $found_existing_track = 0;	
 	if ($last_author && $last_title) {
 		info(INFO, "Will stop downloading when finding track: $last_author - $last_title");
@@ -434,12 +459,15 @@ if($opt{album} || ($opt{playlist} && $opt{kind}))
 		}
 		
 		# Extract artist and title information
-		my $artist = '';
-		my $title = $track_info_ref->{title};
-		my $last_title = "$last_author - $last_title";
 		
-		if ($title eq $last_title) {
-			info(INFO, "Found the last downloaded track: $artist - $title");
+		my $title = $track_info_ref->{title};
+		my $last_full_title = "$last_author - $last_title";
+
+		my $title_len = length($title);
+		my $last_title_full_len = length($last_full_title);		
+		if ($title eq $last_full_title)
+		{
+			info(INFO, "Found the last downloaded track: $title");
 			$found_existing_track = 1;
 			last;
 		}
@@ -1379,4 +1407,21 @@ sub print_debug_info
 	
 	info(DEBUG,  'Cookie: ' . $opt{cookie}) if $opt{cookie};
 	info(DEBUG,  'Auth: ' . $opt{auth}) if $opt{auth};
+}
+
+# Remove Byte Order Mark (BOM, U+FEFF) from the beginning of a string if present
+# @param string to process
+# @return string with BOM removed if it was present, or original string otherwise
+sub remove_bom
+{
+	my $str = shift;
+	if (length($str) > 0) {
+		# Check if the first character is BOM (Unicode 65279)
+		my $first_char = substr($str, 0, 1);
+		if (ord($first_char) == 65279) {
+			$str = substr($str, 1);
+			info(INFO, "Removed BOM from string") if $opt{debug};
+		}
+	}
+	return $str;
 }

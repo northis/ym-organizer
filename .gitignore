@@ -22,3 +22,4 @@ tags
 
 # Configuration files with sensitive data
 config.ps1
+.vstags

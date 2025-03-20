@@ -7,6 +7,7 @@
 # Load configuration from external file
 $configFile = Join-Path -Path $PSScriptRoot -ChildPath "config.ps1"
 $configTemplateFile = Join-Path -Path $PSScriptRoot -ChildPath "config.template.ps1"
+$tagSharpPath = Join-Path -Path $PSScriptRoot -ChildPath "lib\TaglibSharp.dll"
 
 # Check if config.ps1 exists, if not, check if we need to create it from template
 if (Test-Path -Path $configFile) {
@@ -160,11 +161,23 @@ function Download-NewMusic {
     $currentLocation = Get-Location
     Set-Location -Path "$PSScriptRoot\src"
     
-        $author = $MostRecentTrack.Author -replace '"', '\"'  # Escape quotes
-        $title = $MostRecentTrack.Title -replace '"', '\"'    # Escape quotes
-
+    # Prepare author and title for Perl, handling non_ASCII characters
+    $author = $MostRecentTrack.Author -replace '"', '\"'  # Escape quotes
+    $title = $MostRecentTrack.Title -replace '"', '\"'    # Escape quotes
+    
+    # Save author and title to temporary files with UTF-8 encoding
+    $authorFile = Join-Path -Path $env:TEMP -ChildPath "ym_author.txt"
+    $titleFile = Join-Path -Path $env:TEMP -ChildPath "ym_title.txt"
+    
+    [System.IO.File]::WriteAllText($authorFile, $author, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($titleFile, $title, [System.Text.Encoding]::UTF8)
+    
     # Run the perl script
-    perl ya.pl -u $PlaylistUrl --bitrate 320 --path $SourceDir --cookie $Cookie --last_title $title --last_author $author
+    perl ya.pl -u $PlaylistUrl --bitrate 320 --path $SourceDir --cookie $Cookie --last_title_file $titleFile --last_author_file $authorFile
+    
+    # Clean up temporary files
+    Remove-Item -Path $authorFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $titleFile -Force -ErrorAction SilentlyContinue
     
     # Return to original location
     Set-Location -Path $currentLocation    
@@ -297,8 +310,7 @@ function Rename-NewTracks {
     
     Write-Host "Renaming new tracks..."
     
-    Add-Type -Path "lib\TaglibSharp.dll";
-    
+    Add-Type -Path $tagSharpPath;   
     
     foreach ($track in $NewTracks) {
         $file = Get-Item -Path (Join-Path -Path $TargetDir -ChildPath $track.File.Name)
